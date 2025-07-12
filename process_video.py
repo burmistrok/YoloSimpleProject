@@ -1,40 +1,83 @@
 import cv2
 from ultralytics import YOLO
+import glob
+import os
+import sys
 
-# Load the YOLOv8 model (use your own path or model type)
-model = YOLO("yolov8n-seg.pt")  # You can also use yolov8s.pt, yolov8m.pt, etc.
-print(list(model.names.values()))
-# Open the video file or webcam
-video_path = 'Demo/video2.mp4'  # Replace with 0 for webcam
-cap = cv2.VideoCapture(video_path)
+ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 
-out_video_path = "Demo/video2_out.avi"
-output = cv2.VideoWriter(
-    out_video_path, cv2.VideoWriter_fourcc(*'MPEG'), 30, (1080, 1920))
+model = YOLO("yolov8n-seg.pt")
 
-if not cap.isOpened():
-    print("Error: Could not open video.")
-    exit()
-
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        break
-
-    # Run YOLOv8 inference on the frame
+def detect_obj_in_frame(frame):
     results = model(frame)
-
-    # Visualize the results on the frame
     annotated_frame = results[0].plot()
-
-    # Display the frame
- #   cv2.imshow("YOLOv8 Detection", annotated_frame)
-    output.write(annotated_frame)
-    # Press 'q' to exit early
+    cv2.imshow("frame", annotated_frame)
+    
     if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+        raise Exception("Q pressed by the User")
 
-# Cleanup
-cap.release()
-output.release()
-#cv2.destroyAllWindows()
+
+class RecognizeObjects():
+
+    #path were input files are stored
+    in_path = ROOT_PATH + "/Demo/"
+    #path were outup fill will be stored
+    out_path = ROOT_PATH + "/out/"
+    # list of files to work with
+    input_files_list = []
+    # list of out files
+    output_file_list = []
+
+    def __init__(self):
+        mask = self.in_path + "*.mp4"
+        print(mask)
+        for path in glob.glob(mask):
+
+            #find all files added for processing
+            self.input_files_list.append(path)
+            print(path)
+            # create paths to all exit files
+            path_s = path.split("/")
+            name = path_s[-1].split(".")[0]
+            out_name = self.out_path + name + ".mp4"
+            self.output_file_list.append(out_name)
+            print(out_name)
+
+    def play(self, input_files = True):
+        self.process_files(
+            input_files=input_files,
+            function=lambda frame: (cv2.imshow("frame", frame), cv2.waitKey(1))
+        )
+
+
+
+    def process_files(self, input_files = True, function = None):
+        if input_files is not False:
+            files_to_play = self.input_files_list
+        else:
+            files_to_play = self.output_file_list
+        for path in files_to_play:
+            cap = cv2.VideoCapture(path)
+            if not cap.isOpened():
+                print("Error opening video file:", path)
+                return
+            ret, frame = cap.read()
+            while ret:
+                if function is not None:
+                    function(frame)
+                ret, frame = cap.read()
+            cap.release() 
+
+
+    def detect_objs(self):
+        try:
+            self.process_files(
+                function=detect_obj_in_frame
+            )
+        except Exception as e:
+            print(e)
+        cv2.destroyAllWindows()
+    
+
+if __name__ == "__main__":
+    obj = RecognizeObjects().detect_objs()
