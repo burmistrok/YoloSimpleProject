@@ -88,7 +88,7 @@ class RecognizeObjects():
                     print("Error opening video file:", path)
                     return
                 # colect metadata for out file
-                fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+                fourcc = cv2.VideoWriter_fourcc(*'XVID')
                 fps = int(cap.get(cv2.CAP_PROP_FPS))
                 frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                 frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -149,10 +149,10 @@ class RecognizeObjects():
             y_text = obj['y'] - 15 if obj['y'] - 15 > 15 else obj['y'] + 15
             label = label_f.format(obj["name"], obj["confidence"])
             #add object info above shape
-            frame = cv2.putText(frame, label, (20, y_shift),cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            frame = cv2.putText(frame, label, (20, y_shift),cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
             # add object info on left side for statistics
             frame = cv2.putText(frame, label, (obj['x'], y_text),cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-            y_shift += 20
+            y_shift += 40
 
         return frame
 
