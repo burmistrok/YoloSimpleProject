@@ -13,13 +13,12 @@ import numpy as np
 
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 
-red = (255, 0, 0)
+red = (0, 0, 255)
 green = (0, 255, 0)
-blue = (0, 0, 255)
+blue = (255, 0, 0)
 white = (255, 255, 255)
 black = (0, 0, 0)
-yellow = (255, 255, 0)
-
+yellow = (0, 255, 225)
 
 class RecognizeObjects():
 
@@ -116,9 +115,8 @@ class RecognizeObjects():
                     results = self.model(frame)  
                     #parce generated results from yolo
                     results = self.__process_yolo_outs(results)
-                    if 0 < len(results["objects"]):
-                        # draw all metadata to image
-                        frame = self.__process_frame(results, frame)
+                    # draw all metadata to image
+                    frame = self.__process_frame(results, frame)
                     # save frame to output video file
                     out.write(frame)
 
@@ -156,20 +154,22 @@ class RecognizeObjects():
         label_f = "{}: {:.2f}"
         
         h_thr = self.pass_thresold
-        # loop throuth all detecte objects
-        for obj in objects["objects"]:
+        
+        if 0 < len(objects["objects"]):
+            # loop throuth all detecte objects
+            for obj in objects["objects"]:
 
-            # check if pray is detected
-            if obj["name"] == "bird" or obj["name"] == "mouse":
-                # bloc door in case a pray is detected
-                self.is_allowed = False
-                self.actual_collor = red
-            elif obj["name"] == "cat":
-                if (obj["y"] + obj["h"]) > h_thr:
-                    self.does_pass_thr = True
-                    if self.is_allowed is not False:
-                        #open door in case it is allowed to enter
-                        self.actual_collor = green
+                # check if pray is detected
+                if obj["name"] == "bird" or obj["name"] == "mouse":
+                    # bloc door in case a pray is detected
+                    self.is_allowed = False
+                    self.actual_collor = red
+                elif obj["name"] == "cat":
+                    if (obj["y"] + obj["h"]) > h_thr:
+                        self.does_pass_thr = True
+                        if self.is_allowed is not False:
+                            #open door in case it is allowed to enter
+                            self.actual_collor = green
 
             # draw shape of object
             cv2.polylines(frame, obj["shape"], True, self.actual_collor, 5)
@@ -246,3 +246,4 @@ if __name__ == "__main__":
             print("{} does not exist".format(args.play_video))
     else:
         obj.run()
+
