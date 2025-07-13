@@ -13,6 +13,13 @@ import numpy as np
 
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 
+red = (255, 0, 0)
+green = (0, 255, 0)
+blue = (0, 0, 255)
+white = (255, 255, 255)
+black = (0, 0, 0)
+yellow = (255, 255, 0)
+
 
 class RecognizeObjects():
 
@@ -28,9 +35,15 @@ class RecognizeObjects():
     model = None
     __show_result = False
     __classes = None
-    __requested_classes = ["cat"]
+    __requested_classes = ["cat", "bird", "mouse"]
     conf_thresh = 0.1
     __colors = {}
+    actual_collor = yellow
+    is_allowed = True
+    does_pass_thr = False
+    pass_thresold = -1
+    frame_width = 0
+    frame_height = 0
 
     def __init__(self, shwo_res):
         if shwo_res == "True":
@@ -66,15 +79,16 @@ class RecognizeObjects():
         # create yolo instance
         self.model = YOLO("yolov8n-seg.pt")
         self.__classes = self.model.names
-        for key in self.__classes:
-            # a work around for now to show all detected classes
-            self.__requested_classes.append(self.__classes[key])
         self.__colors = {self.__classes[class_name] : random.choices(range(256), k=3) for class_name in self.__classes}
         prev_time = time.time()
         frames = int(0)
         calc_fps = int(0)
         try:
             for path in self.input_files_list:
+
+                self.actual_collor = yellow
+                self.is_allowed = True
+                self.does_pass_thr = False
                 # create paths to all exit files
                 path_s = path.split("/")
                 name = path_s[-1].split(".")[0]
@@ -90,10 +104,11 @@ class RecognizeObjects():
                 # colect metadata for out file
                 fourcc = cv2.VideoWriter_fourcc(*'XVID')
                 fps = int(cap.get(cv2.CAP_PROP_FPS))
-                frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                self.frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                self.frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                self.pass_thresold = int(self.frame_height*0.6)
                 # Create the VideoWriter object
-                out = cv2.VideoWriter(out_path, fourcc, fps, (frame_width, frame_height))
+                out = cv2.VideoWriter(out_path, fourcc, fps, (self.frame_width, self.frame_height))
                 ret, frame = cap.read()
                 while ret:
                     current_time = time.time()
@@ -139,20 +154,38 @@ class RecognizeObjects():
     def __process_frame(self, objects, frame):
         y_shift = 70
         label_f = "{}: {:.2f}"
+        
+        h_thr = self.pass_thresold
+        # loop throuth all detecte objects
         for obj in objects["objects"]:
-            # loop throuth all detecte objects
-            color = self.__colors[obj["name"]]
+
+            # check if pray is detected
+            if obj["name"] == "bird" or obj["name"] == "mouse":
+                # bloc door in case a pray is detected
+                self.is_allowed = False
+                self.actual_collor = red
+            elif obj["name"] == "cat":
+                if (obj["y"] + obj["h"]) > h_thr:
+                    self.does_pass_thr = True
+                    if self.is_allowed is not False:
+                        #open door in case it is allowed to enter
+                        self.actual_collor = green
 
             # draw shape of object
-            cv2.polylines(frame, obj["shape"], True, color, 5)
-            
+            cv2.polylines(frame, obj["shape"], True, self.actual_collor, 5)
+
             y_text = obj['y'] - 15 if obj['y'] - 15 > 15 else obj['y'] + 15
             label = label_f.format(obj["name"], obj["confidence"])
             #add object info above shape
-            frame = cv2.putText(frame, label, (20, y_shift),cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-            # add object info on left side for statistics
-            frame = cv2.putText(frame, label, (obj['x'], y_text),cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-            y_shift += 40
+            frame = cv2.putText(frame, label, (obj['x'], y_text),cv2.FONT_HERSHEY_SIMPLEX, 1, self.actual_collor, 2)
+
+
+        #draw threshold line
+        frame = cv2.line(frame, (0, h_thr), (self.frame_width, h_thr), self.actual_collor, 2)
+        #put meta data
+        frame = cv2.putText(frame, "is allowed: {}".format(self.is_allowed), (50, y_shift),cv2.FONT_HERSHEY_SIMPLEX, 1, self.actual_collor, 2)
+        y_shift += 40
+        frame = cv2.putText(frame, "does it pass thr: {}".format(self.does_pass_thr), (50, y_shift),cv2.FONT_HERSHEY_SIMPLEX, 1, self.actual_collor, 2)
 
         return frame
 
@@ -191,7 +224,7 @@ class RecognizeObjects():
                 for idx in range(no_of_objs):
                     confidence = float(confidences[idx])
                     obj_name = class_ids[idx]
-                    if confidence > self.conf_thresh:
+                    if confidence > self.conf_thresh and obj_name in self.__requested_classes:
                         inst = {"name": obj_name, "confidence":confidence , "x": boxes[idx][0], "y": boxes[idx][1], "w": boxes[idx][2], "h": boxes[idx][3], "shape":shape_points[idx]}
                         ret_value['objects'].append(inst)
         return ret_value
