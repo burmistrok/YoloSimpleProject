@@ -100,8 +100,9 @@ class RecognizeObjects():
                     results = self.model(frame)  
                     #parce generated results from yolo
                     results = self.__process_yolo_outs(results)
-                    # draw all metadata to image
-                    frame = self.__process_frame(results, frame)
+                    if 0 < len(results["objects"]):
+                        # draw all metadata to image
+                        frame = self.__process_frame(results, frame)
                     # save frame to output video file
                     out.write(frame)
 
@@ -164,8 +165,10 @@ class RecognizeObjects():
         
         for result in results:
                 boxes_data = result.boxes
-                for points in result.masks.xy:
-                    shape_points.append(np.int32([points]))
+                
+                if result.masks is not None:
+                    for points in result.masks.xy:
+                        shape_points.append(np.int32([points]))
                 for obj in boxes_data.cls:
                     class_ids.append(self.__classes[int(obj)])
                 for obj in boxes_data.conf:
