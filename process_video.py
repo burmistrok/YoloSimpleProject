@@ -7,6 +7,7 @@ import glob
 import os
 import sys
 import argparse
+import time
 
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 
@@ -58,6 +59,9 @@ class RecognizeObjects():
         if self.model is None:
             # create yolo instance
             self.model = YOLO("yolov8n-seg.pt")
+        prev_time = time.time()
+        frames = int(0)
+        calc_fps = int(0)
         try:
             for path in self.input_files_list:
                 
@@ -87,21 +91,31 @@ class RecognizeObjects():
                 out = cv2.VideoWriter(out_path, fourcc, fps, (frame_width, frame_height))
                 ret, frame = cap.read()
                 while ret:
-
+                    current_time = time.time()
                     #process frame with yolo      
                     results = self.model(frame)
                     #get generated results from yolo
                     annotated_frame = results[0].plot()
+                    
+                    #save out to a file
+                    out.write(annotated_frame)
+
+                    if current_time - prev_time > 1:
+                        calc_fps = frames
+                        frames = int(0)
+                        print(calc_fps)
+                        prev_time = current_time
+
                     if self.__show_result:
+                        annotated_frame = cv2.putText(annotated_frame, str(calc_fps), (50, 50), cv2.FONT_HERSHEY_SIMPLEX,
+                                    1, (255, 0, 0), 2, cv2.LINE_AA)
                         #show frame on display
                         cv2.imshow("frame", annotated_frame)
                         if cv2.waitKey(1) & 0xFF == ord('q'): # Press 'q' to quit
                             raise Exception("User presed Q button")
-
-                    #save out to a file
-                    out.write(annotated_frame)
                     # get next frame
                     ret, frame = cap.read()
+                    frames += 1
                 
                 # release resources
                 cap.release()
