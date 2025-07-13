@@ -26,14 +26,15 @@ class RecognizeObjects():
     output_file_list = []
     # yolo model instance
     model = None
-    __show_result = True
+    __show_result = False
     __classes = None
     __requested_classes = ["cat"]
     conf_thresh = 0.1
     __colors = {}
 
     def __init__(self, shwo_res):
-        self.__show_result = shwo_res
+        if shwo_res == "True":
+            self.__show_result = True
         mask = self.in_path + "*.mp4"
         print(mask)
         for path in glob.glob(mask):
@@ -200,11 +201,11 @@ class RecognizeObjects():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='A simple script for working with yolov8')
     parser.add_argument('--play', type=str, default='', help='Path to the file')
-    parser.add_argument('--show_frames', type=bool, default=True, help='flag to show results on the display during processing')
+    parser.add_argument('--show', type=str, default="True", help='flag to show results on the display during processing')
 
     args = parser.parse_args()
 
-    obj = RecognizeObjects(args.show_frames)
+    obj = RecognizeObjects(args.show)
     if args.play != "":
         if os.path.isfile(args.play):
             obj.play(args.play)
