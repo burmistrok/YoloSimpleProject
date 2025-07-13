@@ -1,20 +1,14 @@
 import cv2
-from ultralytics import YOLO
+try:
+    from ultralytics import YOLO
+except Exception as e:
+    print(e)
 import glob
 import os
 import sys
+import argparse
 
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
-
-model = YOLO("yolov8n-seg.pt")
-
-def detect_obj_in_frame(frame):
-    results = model(frame)
-    annotated_frame = results[0].plot()
-    cv2.imshow("frame", annotated_frame)
-    
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        raise Exception("Q pressed by the User")
 
 
 class RecognizeObjects():
@@ -27,8 +21,12 @@ class RecognizeObjects():
     input_files_list = []
     # list of out files
     output_file_list = []
+    # yolo model instance
+    model = None
+    __show_result = True
 
-    def __init__(self):
+    def __init__(self, shwo_res):
+        self.__show_result = shwo_res
         mask = self.in_path + "*.mp4"
         print(mask)
         for path in glob.glob(mask):
@@ -36,48 +34,98 @@ class RecognizeObjects():
             #find all files added for processing
             self.input_files_list.append(path)
             print(path)
-            # create paths to all exit files
-            path_s = path.split("/")
-            name = path_s[-1].split(".")[0]
-            out_name = self.out_path + name + ".mp4"
-            self.output_file_list.append(out_name)
-            print(out_name)
 
-    def play(self, input_files = True):
-        self.process_files(
-            input_files=input_files,
-            function=lambda frame: (cv2.imshow("frame", frame), cv2.waitKey(1))
-        )
+        ## make sure out path exists
+        if not os.path.exists(self.out_path):
+            os.makedirs(self.out_path)
 
 
-
-    def process_files(self, input_files = True, function = None):
-        if input_files is not False:
-            files_to_play = self.input_files_list
-        else:
-            files_to_play = self.output_file_list
-        for path in files_to_play:
-            cap = cv2.VideoCapture(path)
-            if not cap.isOpened():
-                print("Error opening video file:", path)
-                return
+    def play(self, path):
+        cap = cv2.VideoCapture(path)
+        if not cap.isOpened():
+            print("Error opening video file:", path)
+            return
+        ret, frame = cap.read()
+        while ret:
+            cv2.imshow("frame", frame)
             ret, frame = cap.read()
-            while ret:
-                if function is not None:
-                    function(frame)
-                ret, frame = cap.read()
-            cap.release() 
+            if cv2.waitKey(1) & 0xFF == ord('q'): # Press 'q' to quit
+                break
+        cap.release()
+        cv2.destroyAllWindows()
 
-
-    def detect_objs(self):
+    def run(self):
+        if self.model is None:
+            # create yolo instance
+            self.model = YOLO("yolov8n-seg.pt")
         try:
-            self.process_files(
-                function=detect_obj_in_frame
-            )
+            for path in self.input_files_list:
+                
+
+                # create paths to all exit files
+                path_s = path.split("/")
+                name = path_s[-1].split(".")[0]
+                out_path = self.out_path + name + ".mp4"
+
+                # check if the files exists
+                if not os.path.isfile(path):
+                    print("{} does not exist".format(path))
+
+                # open video file
+                cap = cv2.VideoCapture(path)
+                if not cap.isOpened():
+                    print("Error opening video file:", path)
+                    return
+                
+                # colect metadata for out file
+                fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+                fps = int(cap.get(cv2.CAP_PROP_FPS))
+                frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                        
+                # Create the VideoWriter object
+                out = cv2.VideoWriter(out_path, fourcc, fps, (frame_width, frame_height))
+                ret, frame = cap.read()
+                while ret:
+
+                    #process frame with yolo      
+                    results = self.model(frame)
+                    #get generated results from yolo
+                    annotated_frame = results[0].plot()
+                    if self.__show_result:
+                        #show frame on display
+                        cv2.imshow("frame", annotated_frame)
+                        if cv2.waitKey(1) & 0xFF == ord('q'): # Press 'q' to quit
+                            raise Exception("User presed Q button")
+
+                    #save out to a file
+                    out.write(annotated_frame)
+                    # get next frame
+                    ret, frame = cap.read()
+                
+                # release resources
+                cap.release()
+                out.release()
         except Exception as e:
             print(e)
-        cv2.destroyAllWindows()
-    
+            cap.release()
+            out.release()
+        if self.__show_result:
+            # close window with last frame
+            cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    obj = RecognizeObjects().detect_objs()
+    parser = argparse.ArgumentParser(description='A simple script for working with yolov8')
+    parser.add_argument('--play_video', type=str, default='', help='Path to the file')
+    parser.add_argument('--show_frames', type=bool, default=True, help='The user\'s age.')
+
+    args = parser.parse_args()
+
+    obj = RecognizeObjects(args.show_frames)
+    if args.play_video != "":
+        if os.path.isfile(args.play_video):
+            obj.play(args.play_video)
+        else:
+            print("{} does not exist".format(args.play_video))
+    else:
+        obj.run()
